@@ -162,8 +162,7 @@
 	sudo apache2ctl configtest
 	- перезапуск сервера
 	sudo systemctl restart apache2
-
-	19. Автоматизация развертывания сайта
+19. Автоматизация развертывания сайта
 	- установки git
 	sudo apt-get install git
 	- изменение прав на сайт
@@ -190,3 +189,8 @@
 	- локальные настройки
 	git clone ssh://roger:/home/tasmity/site.git repo
 	git remote add production ssh://roger:/home/tasmity/site.git
+	
+	
+	
+	
+	
