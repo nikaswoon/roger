@@ -1,0 +1,226 @@
+
+## Created by jsabina ##
+
+apt-get update && upgrade -y
+apt-get install sudo, vim
+sudo adduser user sudo
+vim /etc/network/interfaces
+auto enp0s8
+iface enp0s8 inet static
+adress 192.158.55.1
+netmask 255.255.255.252
+systemctl restart networking
+sudo ifup enp0s3
+
+#SSH
+apt-get install openssh-server -y
+vim /etc/ssh/sshd_config
+Port 2121
+PermitRootLogin no
+PubkeyAuthentication yes
+sudo systemctl restart ssh
+sudo systemctl restart sshd
+ssh-keygen -t rsa #Делаем и кидаем с MAC
+ssh-copy-id user@111.111.11.1 -p 2121
+vim /etc/ssh/sshd_config
+PasswordAuthentication no
+ssh/known_host # Чистим при атаке man in the middle
+
+#Firewall
+sudo apt install ufw
+sudo ufw status verbose
+sudo ufw enable
+sudo ufw allow 2121/tcp
+sudo ufw default deny incoming #Вхоядщий поток запрещен
+sudo ufw default allow outgoing
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+sudo ufw logging low
+sudo ufw reload
+sudo ufw status verbose
+#http://blog.sedicomm.com/2018/07/06/kak-nastroit-brandmauer-ufw-na-ubuntu-i-debian
+
+#Защита от DoS атаки
+
+#www.oslogic.ru/knowledge/420/prostaya-zashhita-ot-dos-atak/ttps://vps.ua/wiki/configuring-fail2ban/
+sudo apt-get install libapache2-mod-evasive
+sudo vim /etc/apache2/mods-available/mod-evasive.conf
+	
+	<IfModule mod_evasive20.c>
+	DOSHashTableSize 4096
+	DOSPageCount 3
+	DOSSiteCount 10
+	DOSPageInterval 1
+	DOSSiteInterval 1
+	DOSBlockingPeriod 120
+	DOSWhiteList 192.168.56.1
+	DOSWhiteList 10.0.2.15
+	DOSEmailNotify admin@site.com
+	</IfModule>
+
+
+
+
+#Защита от сканирования
+sudo apt install portsentry -y
+sudo vim   /etc/default/portsentry
+TCP_MODE="atcp"
+UDP_MODE="audp"
+sudo vim /etc/portsentry/portsentry.conf 
+BLOCK_UDP="1"
+BLOCK_TCP="1"
+sudo systemctl restart portsentry
+sudo systemctl status portsentry
+
+#Service
+
+AppArmor — программный инструмент упреждающей защиты, основанный на политиках безопасности (известных также как профили), которые определяют, к каким системным ресурсам и с какими привилегиями может получить доступ то или иное приложение. В AppArmor включён набор стандартных профилей, а также инструменты статического анализа и инструменты, основанные на обучении, позволяющие ускорить и упростить построение новых профилей
+
+getty@.service (сокращение от get teletype) — программа для UNIX-подобных операционных систем, управляющая доступом к физическим и виртуальным терминалам (tty). Программа выполняет запрос имени пользователя и запускает программу 'login' для авторизации пользователя.
+
+autovt@.service - Является симлинком на getty@.service. В том случае, если нам нужен какой-то конкретный VT. За это отвечает logind, который при переключении на ttyN запускает сервис autovt@ttyN.service
+
+cron — классический демон (компьютерная программа в системах класса UNIX), использующийся для периодического выполнения заданий в определённое время. Регулярные действия описываются инструкциями, помещенными в файлы crontab и в специальные каталоги.
+
+D-Bus — система межпроцессного взаимодействия, которая позволяет приложениям в операционной системе сообщаться друг с другом.
+
+Rsyslog - это программная утилита с открытым исходным кодом, используемая в UNIX и Unix-подобных компьютерных системах для пересылки сообщений журнала в IP- сети . Он реализует базовый протокол системного журнала , расширяет его фильтрацией на основе содержимого, широкими возможностями фильтрации, операциями с очередями для обработки автономных выходов [2] , поддержкой различных выходов модуля [3] , гибкими параметрами конфигурации и добавляет такие функции, как использование TCP для транспорта.
+
+Syslog (англ. system log — системный журнал) — стандарт отправки и регистрации сообщений о происходящих в системе событиях (то есть создания событийных журналов), использующийся в компьютерных сетях, работающих по протоколу IP. Термином «syslog» называют как ныне стандартизированный сетевой протокол syslog, так и программное обеспечение (приложение, библиотеку), которое занимается отправкой и получением системных сообщений.
+
+systemd-timesyncd - это демон, который был добавлен для синхронизации системных часов по сети.
+
+#Scripts
+crontab -e - назначяем время исполнения скриптов
+
+# 1 #
+#Create a new file ‘ /var/log/update_script.log ’ and edit its permissions:
+sudo chmod 666 /var/log/update_script.log
+#Create a new script ‘ /etc/cron.d/update_packages.sh ’ and edit its permissions:
+sudo chmod +x /etc/cron.d/update_packages.sh
+#Add the following to the file ‘ /etc/cron.d/update_packages.sh ’: #!/bin/sh
+ LOG="/var/log/update_script.log"
+ sudo apt update -y | tail -n1 > $LOG
+ sudo apt upgrade -y | tail -n1 >> $LOG
+ DATE=`date +%d.%m.%Y`
+ TIME=`date +%T`
+echo "Last update: $(date +%d.%m.%Y)"
+echo "created by:$(date +%T)"
+# exit
+sudo crontab -u имя_пользователя -e
+
+sudo journalctl -e #system journal
+
+
+
+# 2 #
+sudo apt install mailutils -y
+#Create a file ‘ /etc/cron.d/monitor_changes.sh’
+sudo chmod +x /etc/cron.d/monitor_changes.sh
+
+
+#!/bin/sh
+MSG="File /etc/crontab has been modified!"
+SUBJECT="Monitor changes crontab"
+TO="root@localhost"
+HASH="/etc/cron.d/hash.txt"
+FILE="/etc/crontab"
+test -f $HASH || sudo touch $HASH
+CRON_HASH=$(sudo md5sum $FILE | awk '{print $1}')
+if [ "$(cat $HASH)" != "$CRON_HASH" ]; then
+echo "Modifite"
+echo $CRON_HASH > $HASH
+echo $MSG | mail -s "$SUBJECT" $TO
+fi;
+exit
+
+
+# WEB
+
+#Установка сервера Apache
+#https://www.8host.com/blog/ustanovka-veb-servera-apache-v-debian-9
+sudo apt-get update -y
+sudo apt-get install apache2 -y
+sudo systemctl status apache2
+sudo systemctl status apache2
+
+
+
+#Настройка SSL
+#https://www.8host.com/blog/sozdanie-samopodpisannogo-ssl-sertifikata-dlya-apache-v-debian-9/
+sudo openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout /etc/ssl/private/apache-selfsigned.key -out /etc/ssl/certs/apache-selfsigned.crt
+sudo vim /etc/apache2/conf-available/ssl-params.conf
+		#SSLCipherSuite EECDH+AESGCM:EDH+AESGCM:AES256+EECDH:AES256+EDH
+		#SSLProtocol All -SSLv2 -SSLv3 -TLSv1 -TLSv1.1
+		#SSLHonorCipherOrder On
+		## Disable preloading HSTS for now.  You can use the commented out header line that includes
+		#
+		## the "preload" directive if you understand the implications.
+		## Header always set Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+		#Header always set X-Frame-Options DENY
+		#Header always set X-Content-Type-Options nosniff
+		## Requires Apache >= 2.4
+		#SSLCompression off
+		#SSLUseStapling on
+		#SSLStaplingCache "shmcb:logs/stapling-cache(150000)"
+		## Requires Apache >= 2.4.11
+		#SSLSessionTickets Off
+
+sudo cp /etc/apache2/sites-available/default-ssl.conf /etc/apache2/sites-available/default-ssl.conf.bak
+sudo vim /etc/apache2/sites-available/default-ssl.conf
+	<IfModule mod_ssl.c>
+	<VirtualHost _default_:443>
+	ServerAdmin #your_email@example.com
+	ServerName #server_domain_or_IP
+	DocumentRoot /var/www/html
+	ErrorLog ${APACHE_LOG_DIR}/error.log
+	CustomLog ${APACHE_LOG_DIR}/access.log combined
+	SSLEngine on
+	SSLCertificateFile      #/etc/ssl/certs/apache-selfsigned.crt
+	SSLCertificateKeyFile #/etc/ssl/private/apache-selfsigned.key
+	<FilesMatch "\.(cgi|shtml|phtml|php)$">
+	SSLOptions +StdEnvVars
+	</FilesMatch>
+	<Directory /usr/lib/cgi-bin>
+	SSLOptions +StdEnvVars
+	</Directory>
+	</VirtualHost>
+	</IfModule>
+
+sudo vim /etc/apache2/sites-available/000-default.conf
+
+<VirtualHost *:80>
+. . .
+#Redirect permanent "/" "https://your_domain_or_IP/"
+. . .
+</VirtualHost>
+
+sudo a2enmod ssl
+sudo a2enmod headers
+sudo a2ensite default-ssl
+sudo a2enconf ssl-params
+sudo apache2ctl configtest #Syntax OK
+sudo systemctl restart apache2
+
+
+# Deploy part
+apt-get install git
+mkdir /var/repo/html.git
+cd /html.git
+git init --bare
+cd hooks
+vim post-receive
+	#!/bin/sh
+	git --work-tree=/var/www/html --git-dir=/var/repo/html.git checkout -f
+sudo chmod +x post-receive
+sudo chown -hR jsabina /var/repo/html.git/
+sudo chown -hR jsabina /var/www/html/
+exit
+
+MAC mkdir roger
+git init
+git remote add live ssh://jsabina@192.168.55.1:2121/var/repo/html.git
+vim index.html /// Edit
+git add .
+git commit -m "lala"
+git push live master
