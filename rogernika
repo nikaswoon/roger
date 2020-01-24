@@ -1,0 +1,187 @@
+Инструксион
+——————————
+apt-get update
+—//—— upgrade
+apt-get install sudo
+—//—— vim
+
+#создание судо юзера
+————————————————
+adduser user -ingroup sudo
+#или
+sudo adduser username
+Su root
+usermod -aG sudo username
+sudo reboot 
+
+# Настройка IP-адреса, шлюза по умолчанию, маски подсети
+——————————————————
+vim /etc/network/interfaces
+auto enp0s8 // указываем системе что интерфейс enp0s8 нужно включать автоматически
+iface enp0s8 inet static
+adress 192.158.56.1
+netmask 255.255.255.252
+
+systemctl restart networking
+sudo ifup enp0s3
+
+#SSH
+———————————————————
+apt-get install openssh-server
+vim /etc/ssh/sshd_config
+
+Port 50022
+PermitRootLogin no
+PubkeyAuthentication yes
+
+sudo systemctl restart ssh
+sudo systemctl restart sshd
+
+ssh-keygen #генерируем ключи на хосте
+ssh-copy-id user@192.168.56.1 -p 50022
+vim /etc/ssh/sshd_config
+PasswordAuthentication no
+—————
+#если ключ уже есть. И нужно авторизовать нового пользователя
+#Копируем на хосте ключ
+cat ~/.ssh/id_rsa.pub
+
+#Переходим на VM на нового пользователя 
+Su новый пользователь
+#Создаем место под ключик 
+mkdir -p ~/.ssh && touch ~/.ssh/authorized_keys && chmod -R go= ~/.ssh
+#копируем туда ключик и перезапускаемся
+sudo service ssh restart
+sudo service sshd restart
+
+#Что бы каждый раз не вводить пароль от sudo
+sudo vim /etc/sudoers %sudo ALL=(ALL:ALL) NOPASSWD:ALL 
+
+
+
+#Firewall
+————————————————————
+sudo apt-get install ufw
+sudo ufw status verbose
+sudo ufw enable
+sudo ufw allow 50022/tcp
+sudo ufw default deny incoming 
+sudo ufw default allow outgoing
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+sudo ufw logging low
+sudo ufw reload
+sudo ufw status verbose
+http://blog.sedicomm.com/2018/07/06/kak-nastroit-brandmauer-ufw-na-ubuntu-i-debian/
+
+#Защита от DdoS атаки
+
+https://www.oslogic.ru/knowledge/420/prostaya-zashhita-ot-dos-atak/
+https://vps.ua/wiki/configuring-fail2ban/
+
+sudo apt-get install libapache2-mod-evasive
+sudo vim /etc/apache2/mods-available/evasive.conf
+
+посмотреть кто забанен
+sudo fail2ban-client status apache
+Отбавить
+sudo fail2ban-client set apache unbanip 192.168.56.2
+
+
+
+#Защита от сканирования
+sudo apt install portsentry -y
+sudo vim   /etc/default/portsentry
+https://blog.tiukov.com/all/linux-zaschischaemsya-s-pomoschyu-portsentry/
+TCP_MODE="atcp"
+UDP_MODE="audp"
+sudo vim /etc/portsentry/portsentry.conf 
+BLOCK_UDP="1"
+BLOCK_TCP="1"
+# Какие телодвижения предпринимать при обнаружении сканирования:
+# 0 = ничё не делать - некатит, такая опция :)
+# 1 = заблокировать хост и запустить внешнюю команду
+# 2 = только запустить внешнюю команду
+
+sudo systemctl restart portsentry
+sudo systemctl status portsentry
+
+#Service
+
+AppArmor — программный инструмент упреждающей защиты, основанный на политиках безопасности (известных также как профили), которые определяют, к каким системным ресурсам и с какими привилегиями может получить доступ то или иное приложение. В AppArmor включён набор стандартных профилей, а также инструменты статического анализа и инструменты, основанные на обучении, позволяющие ускорить и упростить построение новых профилей
+
+getty@.service (сокращение от get teletype) — программа для UNIX-подобных операционных систем, управляющая доступом к физическим и виртуальным терминалам (tty). Программа выполняет запрос имени пользователя и запускает программу 'login' для авторизации пользователя.
+
+autovt@.service - Является симлинком на getty@.service. В том случае, если нам нужен какой-то конкретный VT. За это отвечает logind, который при переключении на ttyN запускает сервис autovt@ttyN.service
+
+cron — классический демон (компьютерная программа в системах класса UNIX), использующийся для периодического выполнения заданий в определённое время. Регулярные действия описываются инструкциями, помещенными в файлы crontab и в специальные каталоги.
+
+D-Bus — система межпроцессного взаимодействия, которая позволяет приложениям в операционной системе сообщаться друг с другом.
+
+Rsyslog - это программная утилита с открытым исходным кодом, используемая в UNIX и Unix-подобных компьютерных системах для пересылки сообщений журнала в IP- сети . Он реализует базовый протокол системного журнала , расширяет его фильтрацией на основе содержимого, широкими возможностями фильтрации, операциями с очередями для обработки автономных выходов [2] , поддержкой различных выходов модуля [3] , гибкими параметрами конфигурации и добавляет такие функции, как использование TCP для транспорта.
+
+Syslog (англ. system log — системный журнал) — стандарт отправки и регистрации сообщений о происходящих в системе событиях (то есть создания событийных журналов), использующийся в компьютерных сетях, работающих по протоколу IP. Термином «syslog» называют как ныне стандартизированный сетевой протокол syslog, так и программное обеспечение (приложение, библиотеку), которое занимается отправкой и получением системных сообщений.
+
+systemd-timesyncd - это демон, который был добавлен для синхронизации системных часов по сети.
+
+#Scripts
+crontab -e - назначяем время исполнения скриптов
+
+# 1 #
+#создаем файл для лога
+ ‘ /var/log/update_script.log ’ 
+sudo chmod 666 /var/log/update_script.log
+#создаем скрипт
+‘ /etc/cron.d/update_packages.sh ’
+sudo chmod +x /etc/cron.d/update_packages.sh
+
+#!/bin/sh
+
+LOG="/var/log/update_script.log"
+sudo apt-get update -y >> $LOG
+sudo apt-get upgrade -y >> $LOG
+DATE=`date +%d.%m.%Y`
+TIME=`date +%T`
+echo "Last update: $DATE" >> $LOG
+echo "created by:$TIME" >> $LOG
+exit
+
+#добавляем в крон задачи
+sudo crontab -u имя_пользователя -e
+
+sudo journalctl -e #журналирование
+
+
+
+# 2 оповещение рута об изменении файла
+sudo apt install mailutils -y
+sudo apt install postfix
+#создаем скрипт на проверку изменений
+ ‘ /etc/cron.d/monitor_changes.sh’
+sudo chmod +x /etc/cron.d/monitor_changes.sh
+
+
+#!/bin/sh
+MESSAGE="!!!!!!!______File /etc/crontab was modified_______!!!!!!!"
+TO="root@Roger.21-school.ru"
+HASH_BACKUP_FILE=`cat /etc/cron.d/crontab_hash_backup.txt | awk '{print $1}'`
+CRONTAB_FILE="/etc/crontab"
+
+CRON_HASH=$(sudo md5sum $CRONTAB_FILE | awk '{print $1}')
+
+if [ "$HASH_BACKUP_FILE" != "$CRON_HASH" ]; then
+	echo $CRON_HASH > /etc/cron.d/crontab_hash_backup.txt
+	sudo  mail -s "$MESSAGE" $TO < /dev/null
+fi;
+exit
+
+
+#Установка сервера Apache
+https://www.8host.com/blog/ustanovka-veb-servera-apache-v-debian-9/
+
+#создание самоподписанного ssl сертификата
+https://www.8host.com/blog/sozdanie-samopodpisannogo-ssl-sertifikata-dlya-apache-v-debian-9/
+
+# Deploy
+https://hackernoon.com/deploy-website-to-remote-server-using-git-da6048805637
+git push r_live master
